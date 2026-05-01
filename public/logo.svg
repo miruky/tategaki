@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="tategakiのロゴ">
+  <title>tategaki</title>
+  <style>
+    :root { --ink: #3f3a32; --accent: #845f2f; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #d6d1c6; --accent: #cba35e; }
+    }
+  </style>
+  <rect x="8" y="8" width="48" height="48" rx="6" fill="none" stroke="var(--ink)" stroke-width="3"/>
+  <path d="M42 16v32M30 16v22M18 16v12" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>
+</svg>
