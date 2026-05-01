@@ -1,0 +1,539 @@
+/* 紙の本に寄せた配色。読書画面は自動・ライト・ダーク・セピアの4配色。 */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f3ec;
+  --surface: #fdfbf5;
+  --text: #2b2722;
+  --muted: #746e62;
+  --line: #e3ddd0;
+  --accent: #845f2f;
+  --danger: #a4382f;
+  --shadow: 0 1px 2px rgb(43 39 34 / 0.06), 0 8px 24px rgb(43 39 34 / 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='sepia']) {
+    color-scheme: dark;
+    --bg: #17181a;
+    --surface: #1f2124;
+    --text: #e7e4dd;
+    --muted: #9b968a;
+    --line: #34373b;
+    --accent: #cba35e;
+    --danger: #e08a82;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #17181a;
+  --surface: #1f2124;
+  --text: #e7e4dd;
+  --muted: #9b968a;
+  --line: #34373b;
+  --accent: #cba35e;
+  --danger: #e08a82;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.45);
+}
+
+:root[data-theme='sepia'] {
+  color-scheme: light;
+  --bg: #f1e7d0;
+  --surface: #f8f1de;
+  --text: #44392a;
+  --muted: #7d7257;
+  --line: #ddd0b2;
+  --accent: #8a5a2b;
+  --danger: #a4382f;
+  --shadow: 0 1px 2px rgb(68 57 42 / 0.08), 0 8px 24px rgb(68 57 42 / 0.1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+textarea,
+input[type='range'] {
+  font: inherit;
+  color: var(--text);
+}
+
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-weight: 600;
+  transition: filter 0.2s ease;
+}
+
+.primary:hover {
+  filter: brightness(1.1);
+}
+
+.ghost {
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 16px;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ghost:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+/* 書架 */
+
+.shell {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  width: 48px;
+  height: 48px;
+}
+
+h1 {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 1.875rem;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.tagline {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.masthead-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.paste-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  margin-bottom: 24px;
+  animation: rise 0.3s ease both;
+}
+
+.paste-panel textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.paste-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.work-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.work {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  animation: rise 0.35s ease both;
+  animation-delay: calc(var(--i, 0) * 40ms);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.work:hover {
+  transform: translateY(-2px);
+}
+
+.work-open {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 4px 16px;
+  text-align: left;
+  padding: 16px 8px 16px 20px;
+  min-width: 0;
+}
+
+.work-title {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-author {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.work-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.work-progress {
+  width: 72px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.work-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+
+.work-remove {
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.work-remove:hover {
+  color: var(--danger);
+}
+
+.shelf-empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.shelf-empty p {
+  max-width: 36em;
+}
+
+/* 読書画面 */
+
+.reader {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.reader-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reader-head {
+  flex: 1;
+  text-align: center;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-author {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+.settings-panel {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  animation: rise 0.25s ease both;
+}
+
+.setting-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.setting-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-right: 4px;
+}
+
+.setting-option {
+  font-size: 0.8125rem;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.setting-option.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.reader-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.reader-content {
+  position: absolute;
+  top: 32px;
+  right: 40px;
+  height: calc(100% - 64px);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transition: transform 0.25s ease;
+}
+
+.reader-content[data-font='mincho'] {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+}
+
+.reader-content[data-font='gothic'] {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+}
+
+.reader-content p {
+  margin: 0;
+}
+
+.reader-content .blank {
+  min-block-size: 1em;
+}
+
+.doc-title {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-block-end: 1em;
+}
+
+.doc-author {
+  color: var(--muted);
+  font-size: 0.9em;
+  margin-block-end: 2.5em;
+}
+
+.hd {
+  font-weight: 600;
+  margin-block: 1.5em 0.75em;
+}
+
+.hd-1 {
+  font-size: 1.4em;
+}
+
+.hd-2 {
+  font-size: 1.2em;
+}
+
+.hd-3 {
+  font-size: 1.05em;
+}
+
+.tcy {
+  text-combine-upright: all;
+}
+
+.boten {
+  font-style: normal;
+  -webkit-text-emphasis: filled sesame;
+  text-emphasis: filled sesame;
+}
+
+rt {
+  font-size: 0.5em;
+}
+
+.pagebreak {
+  block-size: 3em;
+}
+
+.colophon {
+  margin-block-start: 3em;
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.page-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 15%;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.page-zone:hover,
+.page-zone:focus-visible {
+  opacity: 1;
+}
+
+.zone-next {
+  left: 0;
+  background: linear-gradient(to right, rgb(0 0 0 / 0.05), transparent);
+}
+
+.zone-prev {
+  right: 0;
+  background: linear-gradient(to left, rgb(0 0 0 / 0.05), transparent);
+}
+
+.reader-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#page-slider {
+  flex: 1;
+  direction: rtl;
+  accent-color: var(--accent);
+}
+
+.page-indicator,
+.percent {
+  min-width: 4em;
+}
+
+.percent {
+  text-align: right;
+}
+
+/* トースト */
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 16px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+  z-index: 10;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
