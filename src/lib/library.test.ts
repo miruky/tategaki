@@ -74,6 +74,14 @@ describe('進捗と設定', () => {
       fontSize: 20,
     });
   });
+
+  it('ふりがな表示は既定で有効、切り替えて保存できる', () => {
+    const storage = memoryStorage();
+    const lib = new Library(storage);
+    expect(lib.settings().ruby).toBe(true);
+    lib.updateSettings({ ruby: false });
+    expect(new Library(storage).settings().ruby).toBe(false);
+  });
 });
 
 describe('永続化', () => {
@@ -102,11 +110,16 @@ describe('永続化', () => {
     const storage = memoryStorage();
     storage.setItem(
       'tategaki:v1',
-      JSON.stringify({ works: [], progress: {}, settings: { fontSize: 99, theme: 'neon' } }),
+      JSON.stringify({
+        works: [],
+        progress: {},
+        settings: { fontSize: 99, theme: 'neon', ruby: 'yes' },
+      }),
     );
     const lib = new Library(storage);
     expect(lib.settings().fontSize).toBe(DEFAULT_SETTINGS.fontSize);
     expect(lib.settings().theme).toBe('auto');
+    expect(lib.settings().ruby).toBe(DEFAULT_SETTINGS.ruby);
   });
 });
 
