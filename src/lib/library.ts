@@ -19,6 +19,7 @@ export interface Settings {
   fontSize: number;
   lineHeight: number;
   theme: Theme;
+  ruby: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fontSize: 18,
   lineHeight: 1.9,
   theme: 'auto',
+  ruby: true,
 };
 
 export const FONT_SIZES = [16, 18, 20, 23] as const;
@@ -118,6 +120,7 @@ export class Library {
               : DEFAULT_SETTINGS.lineHeight,
           theme:
             s.theme === 'light' || s.theme === 'dark' || s.theme === 'sepia' ? s.theme : 'auto',
+          ruby: typeof s.ruby === 'boolean' ? s.ruby : DEFAULT_SETTINGS.ruby,
         };
       }
     } catch {
