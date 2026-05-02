@@ -158,11 +158,9 @@ h1 {
 }
 
 .paste-panel {
-  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 10px;
   padding: 16px;
-  box-shadow: var(--shadow);
   margin-bottom: 24px;
   animation: rise 0.3s ease both;
 }
@@ -182,30 +180,38 @@ h1 {
   gap: 8px;
 }
 
+/* 書架は「カードの羅列」をやめ、1px罫線と余白で組む(箱・影を排す)。 */
 .work-list {
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  border-block-start: 1px solid var(--line);
 }
 
 .work {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  animation: rise 0.35s ease both;
-  animation-delay: calc(var(--i, 0) * 40ms);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  border-block-end: 1px solid var(--line);
+  animation: rise 0.4s ease both;
+  animation-delay: calc(var(--i, 0) * 35ms);
 }
 
-.work:hover {
-  transform: translateY(-2px);
+/* ホバーは持ち上げず、左に細いアクセントの栞を出す。 */
+.work::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 2px;
+  background: var(--accent);
+  transform: scaleY(0);
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+.work:hover::before,
+.work:focus-within::before {
+  transform: scaleY(1);
 }
 
 .work-open {
@@ -213,16 +219,17 @@ h1 {
   display: grid;
   grid-template-columns: 1fr auto auto;
   align-items: baseline;
-  gap: 4px 16px;
+  gap: 6px 20px;
   text-align: left;
-  padding: 16px 8px 16px 20px;
+  padding: 22px 8px 22px 24px;
   min-width: 0;
 }
 
 .work-title {
-  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  font-size: 1.0625rem;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+  font-size: 1.1875rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -236,7 +243,7 @@ h1 {
 .work-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: var(--muted);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
@@ -428,6 +435,11 @@ h1 {
 
 rt {
   font-size: 0.5em;
+}
+
+/* ふりがなを隠す設定。読みだけ消し、漢字本文はそのまま残す。 */
+.reader-content.no-ruby rt {
+  display: none;
 }
 
 .pagebreak {
