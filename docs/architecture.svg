@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 420" role="img" aria-label="tategakiのアーキテクチャ図">
+  <title>tategakiのアーキテクチャ。テキストの取り込みからパース・縦書きレンダリング・保存までの流れ。</title>
+  <style>
+    svg { --paper: #f6f3ec; --box: #fdfbf5; --ink: #2b2722; --muted: #746e62; --line: #b6afa0; --accent: #845f2f; }
+    @media (prefers-color-scheme: dark) {
+      svg { --paper: #17181a; --box: #1f2124; --ink: #e7e4dd; --muted: #9b968a; --line: #4d5157; --accent: #cba35e; }
+    }
+    text { font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; fill: var(--ink); }
+    .name { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; font-weight: 600; }
+    .sub { font-size: 11px; fill: var(--muted); }
+    .label { font-size: 10px; fill: var(--muted); }
+    .box { fill: var(--box); stroke: var(--line); }
+    .ext { fill: none; stroke: var(--muted); stroke-dasharray: 5 4; }
+    .flow { fill: none; stroke: var(--accent); stroke-width: 1.5; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L8 4L0 8z" fill="var(--accent)"/>
+    </marker>
+  </defs>
+
+  <rect width="780" height="420" fill="var(--paper)"/>
+  <text x="40" y="46" font-size="16" font-weight="700">tategaki のアーキテクチャ</text>
+
+  <rect class="ext" x="40" y="92" width="150" height="58" rx="8"/>
+  <text x="115" y="116" text-anchor="middle" class="name">.txtファイル</text>
+  <text x="115" y="136" text-anchor="middle" class="sub">Shift_JIS / UTF-8</text>
+
+  <rect class="ext" x="40" y="170" width="150" height="58" rx="8"/>
+  <text x="115" y="194" text-anchor="middle" class="name">貼り付け</text>
+  <text x="115" y="214" text-anchor="middle" class="sub">クリップボード</text>
+
+  <rect class="box" x="240" y="92" width="170" height="58" rx="8"/>
+  <text x="256" y="116" class="name">encoding.ts</text>
+  <text x="256" y="136" class="sub">文字コード自動判別</text>
+
+  <rect class="box" x="240" y="248" width="170" height="58" rx="8"/>
+  <text x="256" y="272" class="name">aozora.ts</text>
+  <text x="256" y="292" class="sub">注記記法のパース</text>
+
+  <rect class="box" x="470" y="248" width="170" height="58" rx="8"/>
+  <text x="486" y="272" class="name">render.ts</text>
+  <text x="486" y="292" class="sub">縦書きHTML・縦中横</text>
+
+  <rect class="box" x="240" y="170" width="170" height="58" rx="8"/>
+  <text x="256" y="194" class="name">library.ts</text>
+  <text x="256" y="214" class="sub">書架・しおり・設定</text>
+
+  <rect class="box" x="470" y="92" width="170" height="58" rx="8"/>
+  <text x="486" y="116" class="name">app.ts</text>
+  <text x="486" y="136" class="sub">書架と読書画面・改ページ</text>
+
+  <rect class="ext" x="470" y="340" width="170" height="50" rx="8"/>
+  <text x="555" y="362" text-anchor="middle" class="name">localStorage</text>
+  <text x="555" y="380" text-anchor="middle" class="sub">本文・進捗・設定</text>
+
+  <path class="flow" d="M190 121 H 238" marker-end="url(#arrow)"/>
+  <path class="flow" d="M190 199 H 238" marker-end="url(#arrow)"/>
+  <path class="flow" d="M410 121 H 468" marker-end="url(#arrow)"/>
+  <text x="439" y="112" text-anchor="middle" class="label">本文</text>
+  <path class="flow" d="M410 192 C 436 192 446 160 468 136" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="452" y="186" class="label">作品・進捗</text>
+  <path class="flow" d="M500 152 C 478 210 420 228 382 246" marker-end="url(#arrow)"/>
+  <text x="468" y="222" class="label">本文</text>
+  <path class="flow" d="M410 277 H 468" marker-end="url(#arrow)"/>
+  <text x="439" y="268" text-anchor="middle" class="label">構造</text>
+  <path class="flow" d="M555 246 V 154" marker-end="url(#arrow)"/>
+  <text x="568" y="204" class="label">HTML</text>
+  <path class="flow" d="M325 228 C 325 330 380 365 468 365" marker-end="url(#arrow)"/>
+  <text x="372" y="352" text-anchor="middle" class="label">JSON</text>
+</svg>

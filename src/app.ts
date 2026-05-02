@@ -138,6 +138,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     content.dataset.font = s.font;
     content.style.fontSize = `${s.fontSize}px`;
     content.style.lineHeight = String(s.lineHeight);
+    content.classList.toggle('no-ruby', !s.ruby);
     applyTheme();
   }
 
@@ -225,7 +226,11 @@ export function mountApp(root: HTMLElement, lib: Library): void {
           label: THEME_LABELS[t],
           active: s.theme === t,
         })),
-      );
+      ) +
+      group('ふりがな', 'ruby', [
+        { value: 'on', label: '表示', active: s.ruby },
+        { value: 'off', label: '隠す', active: !s.ruby },
+      ]);
   }
 
   function renderShelf(): void {
@@ -361,6 +366,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     if (name === 'fontSize') lib.updateSettings({ fontSize: Number(value) });
     if (name === 'lineHeight') lib.updateSettings({ lineHeight: Number(value) });
     if (name === 'theme') lib.updateSettings({ theme: value as Settings['theme'] });
+    if (name === 'ruby') lib.updateSettings({ ruby: value === 'on' });
     renderSettingsPanel();
     applySettings();
     requestAnimationFrame(() => paginate(keep));
