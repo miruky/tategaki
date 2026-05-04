@@ -56,6 +56,12 @@
   box-sizing: border-box;
 }
 
+/* hidden属性は .reader / .panel などの display 指定に負けるので、
+   常に display:none を優先させて確実に隠す。 */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
   background: var(--bg);
@@ -124,37 +130,133 @@ input:focus-visible {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 16px 24px;
   flex-wrap: wrap;
-  margin-bottom: 32px;
+  padding-block-end: 28px;
+  margin-block-end: 8px;
+  border-block-end: 1px solid var(--line);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .logo {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.kicker {
+  color: var(--accent);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: none;
+  margin-block-end: 2px;
 }
 
 h1 {
-  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
-  font-size: 1.875rem;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
 }
 
 .tagline {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  margin-block-start: 4px;
 }
 
 .masthead-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 続きから。アクセントの細い縦罫を左に添えた二段ラベル。 */
+.resume {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 14px 6px 12px;
+  border-inline-start: 2px solid var(--accent);
+  text-align: left;
+  transition: background 0.2s ease;
+}
+
+.resume:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.resume-label {
+  color: var(--accent);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+}
+
+.resume-title {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 0.9375rem;
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 書架メニュー(details/summary のポップオーバー) */
+.lib-menu {
+  position: relative;
+}
+
+.lib-menu summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  padding: 8px 0;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.lib-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.lib-menu-pop {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: calc(100% + 6px);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 13rem;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  animation: rise 0.2s ease both;
+}
+
+.lib-menu-pop button {
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 7px;
+  font-size: 0.875rem;
+  transition: background 0.15s ease;
+}
+
+.lib-menu-pop button:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .paste-panel {
@@ -249,6 +351,12 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.work-marks {
+  color: var(--accent);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+}
+
 .work-progress {
   width: 72px;
   height: 4px;
@@ -323,14 +431,126 @@ h1 {
   font-weight: 400;
 }
 
-.settings-panel {
+.reader-tools {
   display: flex;
-  gap: 24px;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 560px) {
+  .reader-bar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .reader-tools .ghost {
+    padding: 8px 10px;
+  }
+
+  .reader-author {
+    display: none;
+  }
+}
+
+/* 読書画面のパネル(表示・検索・しおり)の共通土台。 */
+.panel {
+  display: flex;
+  align-items: center;
+  gap: 16px 24px;
   flex-wrap: wrap;
-  padding: 12px 24px;
+  padding: 14px 24px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
-  animation: rise 0.25s ease both;
+  animation: rise 0.22s ease both;
+}
+
+.search-panel input {
+  flex: 1;
+  min-width: 10rem;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.search-count {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 5em;
+}
+
+.bookmark-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.bookmark-add {
+  align-self: flex-start;
+}
+
+.bookmark-empty {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.bookmark-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.bookmark {
+  display: flex;
+  align-items: center;
+  border-block-start: 1px solid var(--line);
+}
+
+.bookmark:last-child {
+  border-block-end: 1px solid var(--line);
+}
+
+.bookmark-jump {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  text-align: left;
+  padding: 12px 4px;
+  min-width: 0;
+}
+
+.bookmark-pct {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 3em;
+}
+
+.bookmark-label {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 0.9375rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-jump:hover .bookmark-label {
+  color: var(--accent);
+}
+
+.bookmark-del {
+  color: var(--muted);
+  font-size: 0.75rem;
+  padding: 12px;
+  flex-shrink: 0;
+}
+
+.bookmark-del:hover {
+  color: var(--danger);
 }
 
 .setting-group {
@@ -433,6 +653,18 @@ h1 {
   text-emphasis: filled sesame;
 }
 
+/* 検索の一致。地に薄く敷き、現在の一致だけアクセントで強める。 */
+mark.hit {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+mark.hit.current {
+  background: var(--accent);
+  color: var(--bg);
+}
+
 rt {
   font-size: 0.5em;
 }
@@ -498,8 +730,20 @@ rt {
   min-width: 4em;
 }
 
+.reading-meta {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .percent {
   text-align: right;
+}
+
+/* 字数表示は手狭なときから先に畳む。 */
+@media (max-width: 560px) {
+  .reading-meta {
+    display: none;
+  }
 }
 
 /* トースト */
@@ -526,6 +770,75 @@ rt {
 #toast.show {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+/* ドラッグ中だけ現れる取り込みの目印。 */
+.drop-hint {
+  position: fixed;
+  inset: 16px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg) 86%, var(--accent));
+  color: var(--accent);
+  font-size: 1.125rem;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.drop-hint.show {
+  opacity: 1;
+}
+
+/* キーボード操作のダイアログ。* { margin:0 } に負けないよう中央寄せを明示。 */
+.help {
+  margin: auto;
+  max-width: 28rem;
+  width: calc(100% - 32px);
+  padding: 28px 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.help::backdrop {
+  background: rgb(0 0 0 / 0.4);
+}
+
+.help h2 {
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.04em;
+  margin-block-end: 18px;
+}
+
+.help-keys {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 20px;
+  margin-block-end: 22px;
+}
+
+.help-keys dt {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.8125rem;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.help-keys dd {
+  font-size: 0.875rem;
+}
+
+.help form {
+  text-align: right;
 }
 
 @keyframes rise {
