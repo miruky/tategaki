@@ -480,6 +480,49 @@ h1 {
   min-width: 5em;
 }
 
+.toc-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.toc-empty {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.toc-list {
+  list-style: none;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.toc-jump {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 4px;
+  font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+  font-size: 0.9375rem;
+  border-block-end: 1px solid var(--line);
+  transition: color 0.15s ease;
+}
+
+.toc-jump:hover {
+  color: var(--accent);
+}
+
+.toc-l2 .toc-jump {
+  padding-inline-start: 20px;
+  font-size: 0.875rem;
+}
+
+.toc-l3 .toc-jump {
+  padding-inline-start: 40px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
 .bookmark-panel {
   flex-direction: column;
   align-items: stretch;
