@@ -9,6 +9,22 @@
     />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
     <title>tategaki — 縦書き青空文庫リーダー</title>
+    <script>
+      // 保存済みの配色を描画前に適用してFOUCを防ぐ。autoはCSSのメディアクエリに任せる。
+      (function () {
+        try {
+          var raw = localStorage.getItem('tategaki:v1');
+          if (raw) {
+            var t = JSON.parse(raw).settings.theme;
+            if (t === 'light' || t === 'dark' || t === 'sepia') {
+              document.documentElement.dataset.theme = t;
+            }
+          }
+        } catch (e) {
+          /* 壊れた保存値は無視して既定の配色で始める */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>
