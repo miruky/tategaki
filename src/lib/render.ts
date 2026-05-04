@@ -37,13 +37,15 @@ function renderInline(nodes: Inline[]): string {
 
 const HEADING_TAGS: Record<1 | 2 | 3, string> = { 1: 'h2', 2: 'h3', 3: 'h4' };
 
-export function renderBlock(block: Block): string {
+// index を渡すと見出しに data-h を付け、目次からの移動先にできる。
+export function renderBlock(block: Block, index?: number): string {
   switch (block.type) {
     case 'pagebreak':
       return '<div class="pagebreak" aria-hidden="true"></div>';
     case 'heading': {
       const tag = HEADING_TAGS[block.level];
-      return `<${tag} class="hd hd-${block.level}">${renderInline(block.nodes)}</${tag}>`;
+      const anchor = index === undefined ? '' : ` data-h="${index}"`;
+      return `<${tag} class="hd hd-${block.level}"${anchor}>${renderInline(block.nodes)}</${tag}>`;
     }
     case 'para': {
       if (block.nodes.length === 0) return '<p class="blank"></p>';
@@ -59,7 +61,7 @@ export function renderDoc(doc: AozoraDoc): string {
     `<h1 class="doc-title">${applyTcy(escapeHtml(doc.title))}</h1>` +
     (doc.author === '' ? '' : `<p class="doc-author">${applyTcy(escapeHtml(doc.author))}</p>`) +
     `</header>`;
-  const body = doc.blocks.map(renderBlock).join('');
+  const body = doc.blocks.map((block, i) => renderBlock(block, i)).join('');
   const colophon =
     doc.colophon.length === 0
       ? ''
