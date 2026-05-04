@@ -8,9 +8,10 @@ import type { Bookmark, Library, Settings, Work } from './lib/library';
 import { FONT_SIZES, LibraryError, LINE_HEIGHTS } from './lib/library';
 import {
   countChars,
-  estimateMinutes,
   extractHeadings,
+  filterWorks,
   flattenDoc,
+  remainingMinutes,
   snippetAt,
   splitHighlight,
 } from './lib/reading';
@@ -57,7 +58,9 @@ type Panel = 'settings' | 'search' | 'bookmarks' | 'toc' | null;
 export function mountApp(root: HTMLElement, lib: Library): void {
   let currentId: string | null = null;
   let currentDoc: AozoraDoc | null = null;
+  let currentChars = 0;
   let docText = '';
+  let shelfQuery = '';
   let page = 0;
   let totalPages = 1;
   let pageWidth = 1;
@@ -100,6 +103,10 @@ export function mountApp(root: HTMLElement, lib: Library): void {
             <button type="button" id="paste-add" class="primary">書架に追加</button>
             <button type="button" id="paste-cancel" class="ghost">閉じる</button>
           </div>
+        </div>
+        <div id="shelf-search" class="shelf-search" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input type="search" id="shelf-filter" autocomplete="off" placeholder="題名・著者で絞り込む" aria-label="書架を絞り込む">
         </div>
         <ul id="work-list" class="work-list"></ul>
         <div id="shelf-empty" class="shelf-empty" hidden>
@@ -216,6 +223,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     $('#percent').textContent = `${Math.round(ratio() * 100)}%`;
     slider.max = String(totalPages - 1);
     slider.value = String(page);
+    updateReadingMeta();
     if (save && currentId !== null) {
       lib.setProgress(currentId, ratio());
     }
@@ -308,8 +316,17 @@ export function mountApp(root: HTMLElement, lib: Library): void {
   }
 
   function renderShelf(): void {
-    const works = lib.works();
-    $('#shelf-empty').hidden = works.length > 0;
+    const all = lib.works();
+    $('#shelf-empty').hidden = all.length > 0;
+    // 書架が育ったときだけ絞り込み欄を出す(数冊のうちは不要)。
+    $('#shelf-search').hidden = all.length < 5;
+    const works = filterWorks(all, shelfQuery);
+    if (works.length === 0 && all.length > 0) {
+      $('#work-list').innerHTML =
+        `<li class="work-empty">「${esc(shelfQuery.trim())}」に一致する作品はありません。</li>`;
+      renderResume();
+      return;
+    }
     $('#work-list').innerHTML = works
       .map((w, i) => {
         const pct = Math.round(lib.progress(w.id) * 100);
@@ -399,9 +416,9 @@ export function mountApp(root: HTMLElement, lib: Library): void {
       $('#reading-meta').textContent = '';
       return;
     }
-    const chars = countChars(currentDoc);
-    $('#reading-meta').textContent =
-      `${chars.toLocaleString('ja-JP')}字・約${estimateMinutes(chars)}分`;
+    const remain = remainingMinutes(currentChars, ratio());
+    const tail = remain === 0 ? '読了' : `残り約${remain}分`;
+    $('#reading-meta').textContent = `${currentChars.toLocaleString('ja-JP')}字 · ${tail}`;
   }
 
   function dropBookmark(): void {
@@ -485,6 +502,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
   function openWork(work: Work): void {
     currentId = work.id;
     currentDoc = parseAozora(work.text);
+    currentChars = countChars(currentDoc);
     docText = flattenDoc(currentDoc);
     marks = [];
     matchIndex = -1;
@@ -542,6 +560,11 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     const files = input.files;
     if (files !== null && files.length > 0) readFiles(files);
     input.value = '';
+  });
+
+  $('#shelf-filter').addEventListener('input', (e) => {
+    shelfQuery = (e.target as HTMLInputElement).value;
+    renderShelf();
   });
 
   $('#resume').addEventListener('click', () => {
