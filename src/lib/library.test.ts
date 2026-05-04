@@ -131,3 +131,96 @@ describe('収録サンプル', () => {
     expect(work.author).toBe('tategaki文庫');
   });
 });
+
+describe('しおり', () => {
+  it('割合の昇順で並べて返す', () => {
+    const lib = new Library(memoryStorage());
+    const work = lib.add(TEXT);
+    lib.addBookmark(work.id, 0.6, '後半');
+    lib.addBookmark(work.id, 0.2, '前半');
+    expect(lib.bookmarks(work.id).map((b) => b.label)).toEqual(['前半', '後半']);
+  });
+
+  it('しおりは削除できる', () => {
+    const lib = new Library(memoryStorage());
+    const work = lib.add(TEXT);
+    const bm = lib.addBookmark(work.id, 0.5, 'しるし');
+    lib.removeBookmark(work.id, bm.id);
+    expect(lib.bookmarks(work.id)).toEqual([]);
+  });
+
+  it('作品を消すとしおりも消える', () => {
+    const storage = memoryStorage();
+    const lib = new Library(storage);
+    const work = lib.add(TEXT);
+    lib.addBookmark(work.id, 0.5, 'しるし');
+    lib.remove(work.id);
+    expect(new Library(storage).bookmarks(work.id)).toEqual([]);
+  });
+
+  it('存在しない作品へのしおり追加はLibraryErrorになる', () => {
+    const lib = new Library(memoryStorage());
+    expect(() => lib.addBookmark('none', 0.5, 'x')).toThrow(LibraryError);
+  });
+});
+
+describe('続きから', () => {
+  it('最後に開いた作品を覚え、削除で忘れる', () => {
+    const storage = memoryStorage();
+    const lib = new Library(storage);
+    const work = lib.add(TEXT);
+    lib.setLastRead(work.id);
+    expect(new Library(storage).lastRead()?.id).toBe(work.id);
+    lib.remove(work.id);
+    expect(lib.lastRead()).toBeNull();
+  });
+
+  it('存在しない作品は続きからに記録しない', () => {
+    const lib = new Library(memoryStorage());
+    lib.setLastRead('none');
+    expect(lib.lastRead()).toBeNull();
+  });
+});
+
+describe('書き出しと読み込み', () => {
+  it('書き出したJSONを別の書架へmergeで取り込む', () => {
+    const source = new Library(memoryStorage());
+    const work = source.add(TEXT);
+    source.setProgress(work.id, 0.4);
+    source.addBookmark(work.id, 0.3, 'しるし');
+    const json = source.exportJSON();
+
+    const target = new Library(memoryStorage());
+    const result = target.importJSON(json, 'merge');
+    expect(result.added).toBe(1);
+    expect(target.works()).toHaveLength(1);
+    expect(target.progress(work.id)).toBe(0.4);
+    expect(target.bookmarks(work.id)).toHaveLength(1);
+  });
+
+  it('mergeは同じ本文を二重に取り込まない', () => {
+    const lib = new Library(memoryStorage());
+    lib.add(TEXT);
+    const json = lib.exportJSON();
+    const result = lib.importJSON(json, 'merge');
+    expect(result.added).toBe(0);
+    expect(lib.works()).toHaveLength(1);
+  });
+
+  it('replaceは書架を入れ替える', () => {
+    const source = new Library(memoryStorage());
+    source.add(TEXT);
+    const json = source.exportJSON();
+
+    const target = new Library(memoryStorage());
+    target.add('別の題\n別の著者\n\n別の本文。');
+    target.importJSON(json, 'replace');
+    expect(target.works()).toHaveLength(1);
+    expect(target.works()[0]?.title).toBe('吾輩は猫であるもどき');
+  });
+
+  it('JSONとして壊れた入力はLibraryErrorになる', () => {
+    const lib = new Library(memoryStorage());
+    expect(() => lib.importJSON('{壊れた')).toThrow(LibraryError);
+  });
+});
