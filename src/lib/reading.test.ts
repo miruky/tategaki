@@ -4,6 +4,7 @@ import {
   countChars,
   countMatches,
   estimateMinutes,
+  extractHeadings,
   flattenDoc,
   snippetAt,
   splitHighlight,
@@ -47,6 +48,24 @@ describe('snippetAt', () => {
 
   it('空文字は空のまま返す', () => {
     expect(snippetAt('   ', 0.5)).toBe('');
+  });
+});
+
+describe('extractHeadings', () => {
+  it('見出しを添字つきで拾い、ルビは親文字にする', () => {
+    const doc = parseAozora(
+      '題\n著者\n\n本文。\n［＃「序《じょ》」は大見出し］\n中身。\n［＃「終」は小見出し］',
+    );
+    const headings = extractHeadings(doc);
+    expect(headings.map((h) => [h.level, h.text])).toEqual([
+      [1, '序'],
+      [3, '終'],
+    ]);
+    expect(headings[0]?.index).toBe(1);
+  });
+
+  it('見出しがなければ空配列', () => {
+    expect(extractHeadings(parseAozora('題\n著者\n\n本文のみ。'))).toEqual([]);
   });
 });
 

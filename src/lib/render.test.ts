@@ -61,6 +61,11 @@ describe('renderBlock', () => {
     expect(html).toBe('<h2 class="hd hd-1">一章</h2>');
   });
 
+  it('添字を渡すと見出しに data-h を付ける', () => {
+    const html = renderBlock({ type: 'heading', level: 2, nodes: [{ type: 'text', text: '二' }] }, 3);
+    expect(html).toBe('<h3 class="hd hd-2" data-h="3">二</h3>');
+  });
+
   it('本文のマークアップをエスケープする', () => {
     const html = renderBlock({
       type: 'para',

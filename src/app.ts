@@ -6,7 +6,14 @@ import { parseAozora } from './lib/aozora';
 import { decodeAozora } from './lib/encoding';
 import type { Bookmark, Library, Settings, Work } from './lib/library';
 import { FONT_SIZES, LibraryError, LINE_HEIGHTS } from './lib/library';
-import { countChars, estimateMinutes, flattenDoc, snippetAt, splitHighlight } from './lib/reading';
+import {
+  countChars,
+  estimateMinutes,
+  extractHeadings,
+  flattenDoc,
+  snippetAt,
+  splitHighlight,
+} from './lib/reading';
 import { escapeHtml, renderDoc } from './lib/render';
 import { SAMPLE_TEXT } from './lib/sample';
 
@@ -45,7 +52,7 @@ const THEME_LABELS: Record<Settings['theme'], string> = {
 
 const THEME_ORDER: Settings['theme'][] = ['auto', 'light', 'sepia', 'dark'];
 
-type Panel = 'settings' | 'search' | 'bookmarks' | null;
+type Panel = 'settings' | 'search' | 'bookmarks' | 'toc' | null;
 
 export function mountApp(root: HTMLElement, lib: Library): void {
   let currentId: string | null = null;
@@ -111,11 +118,13 @@ export function mountApp(root: HTMLElement, lib: Library): void {
           <span id="reader-title"></span><span id="reader-author" class="reader-author"></span>
         </div>
         <div class="reader-tools">
+          <button type="button" id="toc-toggle" class="ghost" aria-expanded="false">目次</button>
           <button type="button" id="search-toggle" class="ghost" aria-expanded="false">検索</button>
           <button type="button" id="bookmark-toggle" class="ghost" aria-expanded="false">しおり</button>
           <button type="button" id="settings-toggle" class="ghost" aria-expanded="false">表示</button>
         </div>
       </header>
+      <div id="toc-panel" class="panel toc-panel" hidden></div>
       <div id="settings-panel" class="panel settings-panel" hidden></div>
       <div id="search-panel" class="panel search-panel" hidden>
         <input type="search" id="search-input" placeholder="本文を検索" aria-label="本文を検索">
@@ -146,6 +155,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
         <dt>+ / -</dt><dd>文字を大きく / 小さく</dd>
         <dt>t</dt><dd>配色を切り替え</dd>
         <dt>b</dt><dd>この位置にしおりを挟む</dd>
+        <dt>m</dt><dd>目次を開く</dd>
         <dt>/</dt><dd>本文を検索</dd>
         <dt>?</dt><dd>この一覧</dd>
         <dt>Esc</dt><dd>パネルを閉じる / 書架へ</dd>
@@ -350,14 +360,31 @@ export function mountApp(root: HTMLElement, lib: Library): void {
       `<button type="button" id="drop-bookmark" class="primary bookmark-add">しおりを挟む</button>${items}`;
   }
 
+  function renderToc(): void {
+    if (currentDoc === null) return;
+    const headings = extractHeadings(currentDoc);
+    $('#toc-panel').innerHTML =
+      headings.length === 0
+        ? `<p class="toc-empty">この作品には見出しがありません。</p>`
+        : `<ul class="toc-list">${headings
+            .map(
+              (h) =>
+                `<li class="toc-item toc-l${h.level}"><button type="button" class="toc-jump" data-toc="${h.index}">${esc(h.text)}</button></li>`,
+            )
+            .join('')}</ul>`;
+  }
+
   function setPanel(next: Panel): void {
     openPanel = openPanel === next ? null : next;
+    $('#toc-panel').hidden = openPanel !== 'toc';
     $('#settings-panel').hidden = openPanel !== 'settings';
     $('#search-panel').hidden = openPanel !== 'search';
     $('#bookmark-panel').hidden = openPanel !== 'bookmarks';
+    $('#toc-toggle').setAttribute('aria-expanded', String(openPanel === 'toc'));
     $('#settings-toggle').setAttribute('aria-expanded', String(openPanel === 'settings'));
     $('#search-toggle').setAttribute('aria-expanded', String(openPanel === 'search'));
     $('#bookmark-toggle').setAttribute('aria-expanded', String(openPanel === 'bookmarks'));
+    if (openPanel === 'toc') renderToc();
     if (openPanel === 'settings') renderSettingsPanel();
     if (openPanel === 'bookmarks') renderBookmarks();
     if (openPanel === 'search') {
@@ -468,6 +495,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     applySettings();
     updateReadingMeta();
     openPanel = null;
+    $('#toc-panel').hidden = true;
     $('#settings-panel').hidden = true;
     $('#search-panel').hidden = true;
     $('#bookmark-panel').hidden = true;
@@ -610,9 +638,17 @@ export function mountApp(root: HTMLElement, lib: Library): void {
 
   $('#back').addEventListener('click', closeReader);
 
+  $('#toc-toggle').addEventListener('click', () => setPanel('toc'));
   $('#settings-toggle').addEventListener('click', () => setPanel('settings'));
   $('#search-toggle').addEventListener('click', () => setPanel('search'));
   $('#bookmark-toggle').addEventListener('click', () => setPanel('bookmarks'));
+
+  $('#toc-panel').addEventListener('click', (e) => {
+    const jump = (e.target as HTMLElement).closest<HTMLElement>('[data-toc]');
+    if (jump === null) return;
+    const target = content.querySelector<HTMLElement>(`[data-h="${jump.dataset.toc}"]`);
+    if (target !== null) goTo(pageOfElement(target));
+  });
 
   $('#settings-panel').addEventListener('click', (e) => {
     const button = (e.target as HTMLElement).closest<HTMLElement>('[data-setting]');
@@ -729,6 +765,9 @@ export function mountApp(root: HTMLElement, lib: Library): void {
         break;
       case 'b':
         dropBookmark();
+        break;
+      case 'm':
+        setPanel('toc');
         break;
       case '/':
         e.preventDefault();
