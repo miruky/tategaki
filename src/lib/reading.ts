@@ -9,6 +9,23 @@ function inlineText(nodes: Inline[]): string {
     .join('');
 }
 
+export interface HeadingEntry {
+  index: number;
+  level: 1 | 2 | 3;
+  text: string;
+}
+
+// 目次。block配列の添字を持たせ、本文中の data-h と対応づける。
+export function extractHeadings(doc: AozoraDoc): HeadingEntry[] {
+  const out: HeadingEntry[] = [];
+  doc.blocks.forEach((block, index) => {
+    if (block.type === 'heading') {
+      out.push({ index, level: block.level, text: inlineText(block.nodes) });
+    }
+  });
+  return out;
+}
+
 // 本文を1本の文字列へ均す。ルビは親文字だけ、見出しも本文に含める。
 // しおりの抜き出しと検索の対象に使うので、読者が目にする文字列に寄せる。
 export function flattenDoc(doc: AozoraDoc): string {
