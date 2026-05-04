@@ -1,10 +1,12 @@
 // 書架と読書画面。ページ送りは「行送り幅の整数倍」を1ページ幅にする
 // ことで、ページ境界で縦の行が裂けないようにしている。
 
+import type { AozoraDoc } from './lib/aozora';
 import { parseAozora } from './lib/aozora';
 import { decodeAozora } from './lib/encoding';
-import type { Library, Settings, Work } from './lib/library';
+import type { Bookmark, Library, Settings, Work } from './lib/library';
 import { FONT_SIZES, LibraryError, LINE_HEIGHTS } from './lib/library';
+import { countChars, estimateMinutes, flattenDoc, snippetAt, splitHighlight } from './lib/reading';
 import { escapeHtml, renderDoc } from './lib/render';
 import { SAMPLE_TEXT } from './lib/sample';
 
@@ -41,11 +43,20 @@ const THEME_LABELS: Record<Settings['theme'], string> = {
   sepia: 'セピア',
 };
 
+const THEME_ORDER: Settings['theme'][] = ['auto', 'light', 'sepia', 'dark'];
+
+type Panel = 'settings' | 'search' | 'bookmarks' | null;
+
 export function mountApp(root: HTMLElement, lib: Library): void {
   let currentId: string | null = null;
+  let currentDoc: AozoraDoc | null = null;
+  let docText = '';
   let page = 0;
   let totalPages = 1;
   let pageWidth = 1;
+  let openPanel: Panel = null;
+  let marks: HTMLElement[] = [];
+  let matchIndex = -1;
 
   root.innerHTML = `
     <div id="shelf" class="shelf">
@@ -54,14 +65,25 @@ export function mountApp(root: HTMLElement, lib: Library): void {
           <div class="brand">
             ${LOGO}
             <div>
+              <p class="kicker">青空文庫リーダー</p>
               <h1>tategaki</h1>
               <p class="tagline">縦書きで読む、青空文庫リーダー</p>
             </div>
           </div>
           <div class="masthead-actions">
+            <button type="button" id="resume" class="resume" hidden></button>
             <button type="button" id="open-file" class="primary">ファイルを開く</button>
-            <button type="button" id="toggle-paste" class="ghost">貼り付けて追加</button>
-            <input type="file" id="file-input" accept=".txt,text/plain" hidden>
+            <button type="button" id="toggle-paste" class="ghost">貼り付け</button>
+            <details class="lib-menu">
+              <summary class="ghost" aria-label="書架メニュー">…</summary>
+              <div class="lib-menu-pop" role="menu">
+                <button type="button" id="export-lib" role="menuitem">書架を書き出す</button>
+                <button type="button" id="import-lib" role="menuitem">書架を読み込む</button>
+                <button type="button" id="show-help" role="menuitem">キーボード操作</button>
+              </div>
+            </details>
+            <input type="file" id="file-input" accept=".txt,text/plain" hidden multiple>
+            <input type="file" id="import-input" accept="application/json,.json" hidden>
           </div>
         </header>
         <div id="paste-panel" class="paste-panel" hidden>
@@ -74,10 +96,11 @@ export function mountApp(root: HTMLElement, lib: Library): void {
         </div>
         <ul id="work-list" class="work-list"></ul>
         <div id="shelf-empty" class="shelf-empty" hidden>
-          <p>書架は空です。青空文庫のテキストファイル(.txt)を開くか、本文を貼り付けてください。
+          <p>書架は空です。青空文庫のテキストファイル(.txt)を開くか画面へ放り込むか、本文を貼り付けてください。
             まずは収録サンプルで縦書きの組みを確かめられます。</p>
           <button type="button" id="open-sample" class="ghost">サンプル「縦書きのすすめ」を読む</button>
         </div>
+        <div id="drop-hint" class="drop-hint" aria-hidden="true">ここに .txt を放す</div>
       </div>
     </div>
 
@@ -87,9 +110,20 @@ export function mountApp(root: HTMLElement, lib: Library): void {
         <div class="reader-head">
           <span id="reader-title"></span><span id="reader-author" class="reader-author"></span>
         </div>
-        <button type="button" id="settings-toggle" class="ghost" aria-expanded="false">表示</button>
+        <div class="reader-tools">
+          <button type="button" id="search-toggle" class="ghost" aria-expanded="false">検索</button>
+          <button type="button" id="bookmark-toggle" class="ghost" aria-expanded="false">しおり</button>
+          <button type="button" id="settings-toggle" class="ghost" aria-expanded="false">表示</button>
+        </div>
       </header>
-      <div id="settings-panel" class="settings-panel" hidden></div>
+      <div id="settings-panel" class="panel settings-panel" hidden></div>
+      <div id="search-panel" class="panel search-panel" hidden>
+        <input type="search" id="search-input" placeholder="本文を検索" aria-label="本文を検索">
+        <span id="search-count" class="search-count" aria-live="polite"></span>
+        <button type="button" id="search-prev" class="ghost" aria-label="前の一致">前</button>
+        <button type="button" id="search-next" class="ghost" aria-label="次の一致">次</button>
+      </div>
+      <div id="bookmark-panel" class="panel bookmark-panel" hidden></div>
       <div id="viewport" class="reader-viewport">
         <div id="content" class="reader-content" data-font="mincho"></div>
         <button type="button" class="page-zone zone-next" aria-label="次のページ"></button>
@@ -98,9 +132,26 @@ export function mountApp(root: HTMLElement, lib: Library): void {
       <footer class="reader-foot">
         <span id="page-indicator" class="page-indicator"></span>
         <input type="range" id="page-slider" min="0" max="0" value="0" aria-label="ページ位置">
+        <span id="reading-meta" class="reading-meta"></span>
         <span id="percent" class="percent"></span>
       </footer>
     </div>
+
+    <dialog id="help" class="help">
+      <h2>キーボード操作</h2>
+      <dl class="help-keys">
+        <dt>← / Space</dt><dd>次のページ</dd>
+        <dt>→</dt><dd>前のページ</dd>
+        <dt>Home / End</dt><dd>最初 / 最後のページ</dd>
+        <dt>+ / -</dt><dd>文字を大きく / 小さく</dd>
+        <dt>t</dt><dd>配色を切り替え</dd>
+        <dt>b</dt><dd>この位置にしおりを挟む</dd>
+        <dt>/</dt><dd>本文を検索</dd>
+        <dt>?</dt><dd>この一覧</dd>
+        <dt>Esc</dt><dd>パネルを閉じる / 書架へ</dd>
+      </dl>
+      <form method="dialog"><button class="ghost">閉じる</button></form>
+    </dialog>
     <div id="toast" role="status" aria-live="polite"></div>`;
 
   const $ = <T extends HTMLElement>(selector: string): T => {
@@ -115,6 +166,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
   const content = $('#content');
   const slider = $<HTMLInputElement>('#page-slider');
   const toastBox = $('#toast');
+  const helpDialog = $<HTMLDialogElement>('#help');
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   function toast(message: string): void {
@@ -233,18 +285,33 @@ export function mountApp(root: HTMLElement, lib: Library): void {
       ]);
   }
 
+  function renderResume(): void {
+    const last = lib.lastRead();
+    const button = $<HTMLButtonElement>('#resume');
+    if (last === null) {
+      button.hidden = true;
+      return;
+    }
+    button.hidden = false;
+    button.innerHTML = `<span class="resume-label">続きから</span><span class="resume-title">${esc(last.title)}</span>`;
+    button.dataset.id = last.id;
+  }
+
   function renderShelf(): void {
     const works = lib.works();
     $('#shelf-empty').hidden = works.length > 0;
     $('#work-list').innerHTML = works
       .map((w, i) => {
         const pct = Math.round(lib.progress(w.id) * 100);
+        const markCount = lib.bookmarks(w.id).length;
+        const markBadge = markCount > 0 ? `<span class="work-marks">しおり${markCount}</span>` : '';
         return `
         <li class="work" style="--i:${Math.min(i, 11)}">
           <button type="button" class="work-open" data-open="${esc(w.id)}">
             <span class="work-title">${esc(w.title)}</span>
             <span class="work-author">${esc(w.author)}</span>
             <span class="work-meta">
+              ${markBadge}
               <span class="work-progress"><span class="work-progress-fill" style="width:${pct}%"></span></span>
               ${pct}%
             </span>
@@ -253,14 +320,157 @@ export function mountApp(root: HTMLElement, lib: Library): void {
         </li>`;
       })
       .join('');
+    renderResume();
+  }
+
+  function renderContent(): void {
+    if (currentDoc === null) return;
+    content.innerHTML = renderDoc(currentDoc);
+  }
+
+  function renderBookmarks(): void {
+    if (currentId === null) return;
+    const list = lib.bookmarks(currentId);
+    const items =
+      list.length === 0
+        ? `<p class="bookmark-empty">しおりはまだありません。「しおりを挟む」で今のページを記録できます。</p>`
+        : `<ul class="bookmark-list">${list
+            .map(
+              (b) => `
+            <li class="bookmark">
+              <button type="button" class="bookmark-jump" data-jump="${esc(b.id)}">
+                <span class="bookmark-pct">${Math.round(b.ratio * 100)}%</span>
+                <span class="bookmark-label">${esc(b.label === '' ? '(無題のしおり)' : b.label)}</span>
+              </button>
+              <button type="button" class="bookmark-del" data-del="${esc(b.id)}" aria-label="このしおりを削除">削除</button>
+            </li>`,
+            )
+            .join('')}</ul>`;
+    $('#bookmark-panel').innerHTML =
+      `<button type="button" id="drop-bookmark" class="primary bookmark-add">しおりを挟む</button>${items}`;
+  }
+
+  function setPanel(next: Panel): void {
+    openPanel = openPanel === next ? null : next;
+    $('#settings-panel').hidden = openPanel !== 'settings';
+    $('#search-panel').hidden = openPanel !== 'search';
+    $('#bookmark-panel').hidden = openPanel !== 'bookmarks';
+    $('#settings-toggle').setAttribute('aria-expanded', String(openPanel === 'settings'));
+    $('#search-toggle').setAttribute('aria-expanded', String(openPanel === 'search'));
+    $('#bookmark-toggle').setAttribute('aria-expanded', String(openPanel === 'bookmarks'));
+    if (openPanel === 'settings') renderSettingsPanel();
+    if (openPanel === 'bookmarks') renderBookmarks();
+    if (openPanel === 'search') {
+      $<HTMLInputElement>('#search-input').focus();
+    } else if (marks.length > 0) {
+      clearSearch();
+    }
+  }
+
+  function updateReadingMeta(): void {
+    if (currentDoc === null) {
+      $('#reading-meta').textContent = '';
+      return;
+    }
+    const chars = countChars(currentDoc);
+    $('#reading-meta').textContent =
+      `${chars.toLocaleString('ja-JP')}字・約${estimateMinutes(chars)}分`;
+  }
+
+  function dropBookmark(): void {
+    if (currentId === null) return;
+    const label = snippetAt(docText, ratio());
+    lib.addBookmark(currentId, ratio(), label);
+    toast('しおりを挟みました');
+    if (openPanel === 'bookmarks') renderBookmarks();
+  }
+
+  // 検索: いったん素の本文へ戻してから一致箇所を <mark> で包む。
+  // ルビの読み(rt)は対象から外し、本文と親文字だけを探す。
+  function runSearch(query: string): void {
+    renderContent();
+    marks = [];
+    matchIndex = -1;
+    if (query !== '') {
+      const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, {
+        acceptNode: (node) =>
+          (node.parentElement?.closest('rt') ?? null) === null
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_REJECT,
+      });
+      const needle = query.toLowerCase();
+      const targets: Text[] = [];
+      for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+        if ((n.textContent ?? '').toLowerCase().includes(needle)) {
+          targets.push(n as Text);
+        }
+      }
+      for (const node of targets) {
+        const segments = splitHighlight(node.textContent ?? '', query);
+        const frag = document.createDocumentFragment();
+        for (const seg of segments) {
+          if (seg.hit) {
+            const mark = document.createElement('mark');
+            mark.className = 'hit';
+            mark.textContent = seg.text;
+            marks.push(mark);
+            frag.appendChild(mark);
+          } else {
+            frag.appendChild(document.createTextNode(seg.text));
+          }
+        }
+        node.replaceWith(frag);
+      }
+    }
+    $('#search-count').textContent =
+      query === '' ? '' : marks.length === 0 ? '見つかりません' : `${marks.length}件`;
+    if (marks.length > 0) gotoMatch(0);
+  }
+
+  function pageOfElement(el: HTMLElement): number {
+    const fromStart = content.getBoundingClientRect().right - el.getBoundingClientRect().right;
+    const target = Math.floor(fromStart / pageWidth);
+    return Math.min(totalPages - 1, Math.max(0, target));
+  }
+
+  function gotoMatch(delta: number): void {
+    if (marks.length === 0) return;
+    matchIndex = (matchIndex + delta + marks.length) % marks.length;
+    marks.forEach((m, i) => m.classList.toggle('current', i === matchIndex));
+    const mark = marks[matchIndex];
+    if (mark !== undefined) {
+      goTo(pageOfElement(mark));
+      $('#search-count').textContent = `${matchIndex + 1} / ${marks.length}件`;
+    }
+  }
+
+  function clearSearch(): void {
+    if (marks.length === 0 && matchIndex === -1) return;
+    marks = [];
+    matchIndex = -1;
+    const keep = ratio();
+    renderContent();
+    paginate(keep);
+    $('#search-count').textContent = '';
+    $<HTMLInputElement>('#search-input').value = '';
   }
 
   function openWork(work: Work): void {
     currentId = work.id;
+    currentDoc = parseAozora(work.text);
+    docText = flattenDoc(currentDoc);
+    marks = [];
+    matchIndex = -1;
+    lib.setLastRead(work.id);
     $('#reader-title').textContent = work.title;
     $('#reader-author').textContent = work.author === '' ? '' : ` ${work.author}`;
-    content.innerHTML = renderDoc(parseAozora(work.text));
+    renderContent();
     applySettings();
+    updateReadingMeta();
+    openPanel = null;
+    $('#settings-panel').hidden = true;
+    $('#search-panel').hidden = true;
+    $('#bookmark-panel').hidden = true;
     shelfEl.hidden = true;
     readerEl.hidden = false;
     const saved = lib.progress(work.id);
@@ -270,6 +480,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
 
   function closeReader(): void {
     currentId = null;
+    currentDoc = null;
     readerEl.hidden = true;
     shelfEl.hidden = false;
     renderShelf();
@@ -286,18 +497,68 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     }
   }
 
+  function readFiles(files: FileList | File[]): void {
+    for (const file of Array.from(files)) {
+      void file.arrayBuffer().then((buffer) => {
+        addText(decodeAozora(new Uint8Array(buffer)));
+      });
+    }
+  }
+
   $('#open-file').addEventListener('click', () => {
     $<HTMLInputElement>('#file-input').click();
   });
 
   $<HTMLInputElement>('#file-input').addEventListener('change', (e) => {
     const input = e.target as HTMLInputElement;
+    const files = input.files;
+    if (files !== null && files.length > 0) readFiles(files);
+    input.value = '';
+  });
+
+  $('#resume').addEventListener('click', () => {
+    const id = $<HTMLButtonElement>('#resume').dataset.id ?? '';
+    const work = lib.get(id);
+    if (work !== null) openWork(work);
+  });
+
+  $('#export-lib').addEventListener('click', () => {
+    const blob = new Blob([lib.exportJSON()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tategaki-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    $<HTMLDetailsElement>('.lib-menu').open = false;
+  });
+
+  $('#import-lib').addEventListener('click', () => {
+    $<HTMLInputElement>('#import-input').click();
+    $<HTMLDetailsElement>('.lib-menu').open = false;
+  });
+
+  $<HTMLInputElement>('#import-input').addEventListener('change', (e) => {
+    const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
     if (file === undefined) return;
-    void file.arrayBuffer().then((buffer) => {
-      addText(decodeAozora(new Uint8Array(buffer)));
+    void file.text().then((text) => {
+      try {
+        const { added } = lib.importJSON(text, 'merge');
+        toast(
+          added === 0 ? '新しく追加する作品はありませんでした' : `${added}作品を読み込みました`,
+        );
+        renderShelf();
+      } catch (err) {
+        toast(err instanceof LibraryError ? err.message : '読み込みに失敗しました');
+      }
     });
+  });
+
+  $('#show-help').addEventListener('click', () => {
+    $<HTMLDetailsElement>('.lib-menu').open = false;
+    helpDialog.showModal();
   });
 
   $('#toggle-paste').addEventListener('click', () => {
@@ -349,12 +610,9 @@ export function mountApp(root: HTMLElement, lib: Library): void {
 
   $('#back').addEventListener('click', closeReader);
 
-  $('#settings-toggle').addEventListener('click', () => {
-    const panel = $('#settings-panel');
-    panel.hidden = !panel.hidden;
-    $('#settings-toggle').setAttribute('aria-expanded', String(!panel.hidden));
-    if (!panel.hidden) renderSettingsPanel();
-  });
+  $('#settings-toggle').addEventListener('click', () => setPanel('settings'));
+  $('#search-toggle').addEventListener('click', () => setPanel('search'));
+  $('#bookmark-toggle').addEventListener('click', () => setPanel('bookmarks'));
 
   $('#settings-panel').addEventListener('click', (e) => {
     const button = (e.target as HTMLElement).closest<HTMLElement>('[data-setting]');
@@ -372,12 +630,72 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     requestAnimationFrame(() => paginate(keep));
   });
 
+  $('#search-input').addEventListener('input', (e) => {
+    runSearch((e.target as HTMLInputElement).value.trim());
+  });
+
+  $('#search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      gotoMatch(e.shiftKey ? -1 : 1);
+    } else if (e.key === 'Escape') {
+      setPanel('search');
+    }
+  });
+
+  $('#search-prev').addEventListener('click', () => gotoMatch(-1));
+  $('#search-next').addEventListener('click', () => gotoMatch(1));
+
+  $('#bookmark-panel').addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('#drop-bookmark') !== null) {
+      dropBookmark();
+      return;
+    }
+    const jump = target.closest<HTMLElement>('[data-jump]');
+    if (jump !== null && currentId !== null) {
+      const bm = lib.bookmarks(currentId).find((b: Bookmark) => b.id === jump.dataset.jump);
+      if (bm !== undefined) goTo(Math.round(bm.ratio * (totalPages - 1)));
+      return;
+    }
+    const del = target.closest<HTMLElement>('[data-del]');
+    if (del !== null && currentId !== null) {
+      lib.removeBookmark(currentId, del.dataset.del ?? '');
+      renderBookmarks();
+      renderShelf();
+    }
+  });
+
   root.querySelector('.zone-next')?.addEventListener('click', () => goTo(page + 1));
   root.querySelector('.zone-prev')?.addEventListener('click', () => goTo(page - 1));
 
   slider.addEventListener('input', () => goTo(Number(slider.value)));
 
+  function cycleFontSize(delta: number): void {
+    const sizes = FONT_SIZES as readonly number[];
+    const at = sizes.indexOf(lib.settings().fontSize);
+    const next = sizes[Math.min(sizes.length - 1, Math.max(0, at + delta))];
+    if (next === undefined || next === lib.settings().fontSize) return;
+    const keep = ratio();
+    lib.updateSettings({ fontSize: next });
+    applySettings();
+    requestAnimationFrame(() => paginate(keep));
+  }
+
+  function cycleTheme(): void {
+    const at = THEME_ORDER.indexOf(lib.settings().theme);
+    const next = THEME_ORDER[(at + 1) % THEME_ORDER.length] ?? 'auto';
+    lib.updateSettings({ theme: next });
+    applySettings();
+    toast(`配色: ${THEME_LABELS[next]}`);
+  }
+
   document.addEventListener('keydown', (e) => {
+    if (e.key === '?' && !readerEl.hidden) {
+      e.preventDefault();
+      helpDialog.showModal();
+      return;
+    }
     if (readerEl.hidden) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement && active.type !== 'range') return;
@@ -400,10 +718,44 @@ export function mountApp(root: HTMLElement, lib: Library): void {
       case 'End':
         goTo(totalPages - 1);
         break;
+      case '+':
+        cycleFontSize(1);
+        break;
+      case '-':
+        cycleFontSize(-1);
+        break;
+      case 't':
+        cycleTheme();
+        break;
+      case 'b':
+        dropBookmark();
+        break;
+      case '/':
+        e.preventDefault();
+        if (openPanel !== 'search') setPanel('search');
+        else $<HTMLInputElement>('#search-input').focus();
+        break;
       case 'Escape':
-        closeReader();
+        if (openPanel !== null) setPanel(openPanel);
+        else closeReader();
         break;
     }
+  });
+
+  // 書架へのドラッグ&ドロップでファイルを取り込む。
+  const dropHint = $('#drop-hint');
+  shelfEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropHint.classList.add('show');
+  });
+  shelfEl.addEventListener('dragleave', (e) => {
+    if (e.relatedTarget === null) dropHint.classList.remove('show');
+  });
+  shelfEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropHint.classList.remove('show');
+    const files = e.dataTransfer?.files;
+    if (files !== undefined && files.length > 0) readFiles(files);
   });
 
   let resizeTimer: ReturnType<typeof setTimeout> | undefined;
