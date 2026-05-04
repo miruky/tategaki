@@ -2,11 +2,10 @@
 // ラベル抜き出し・本文内検索の素材づくりを、DOMから切り離して扱う。
 
 import type { AozoraDoc, Inline } from './aozora';
+import type { Work } from './library';
 
 function inlineText(nodes: Inline[]): string {
-  return nodes
-    .map((node) => (node.type === 'ruby' ? node.base : node.text))
-    .join('');
+  return nodes.map((node) => (node.type === 'ruby' ? node.base : node.text)).join('');
 }
 
 export interface HeadingEntry {
@@ -46,6 +45,23 @@ const CHARS_PER_MINUTE = 500;
 export function estimateMinutes(chars: number): number {
   if (chars <= 0) return 0;
   return Math.max(1, Math.round(chars / CHARS_PER_MINUTE));
+}
+
+// 読み終わりまでの残り時間。読書位置(0〜1)から未読の字数を見積もる。
+// 読了(ratio>=1)では0を返し、表示側で「読了」に振り分ける。
+export function remainingMinutes(totalChars: number, ratio: number): number {
+  const clamped = Math.min(1, Math.max(0, ratio));
+  return estimateMinutes(Math.round(totalChars * (1 - clamped)));
+}
+
+// 書架の絞り込み。題名・著者への部分一致で残す。空クエリは全件。
+// ラテン文字は大文字小文字を区別しない。
+export function filterWorks(works: Work[], query: string): Work[] {
+  const q = query.trim().toLowerCase();
+  if (q === '') return works;
+  return works.filter(
+    (w) => w.title.toLowerCase().includes(q) || w.author.toLowerCase().includes(q),
+  );
 }
 
 // しおりのラベルに使う、読書位置あたりの一節。改行は詰める。
