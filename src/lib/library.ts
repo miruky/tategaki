@@ -11,6 +11,13 @@ export interface Work {
   addedAt: string;
 }
 
+export interface Bookmark {
+  id: string;
+  ratio: number;
+  label: string;
+  createdAt: string;
+}
+
 export type FontFamily = 'mincho' | 'gothic';
 export type Theme = 'auto' | 'light' | 'dark' | 'sepia';
 
@@ -59,6 +66,37 @@ interface Persisted {
   works: Work[];
   progress: Record<string, number>;
   settings: Settings;
+  bookmarks: Record<string, Bookmark[]>;
+  lastReadId: string | null;
+}
+
+function coerceBookmark(value: unknown): Bookmark | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const v = value as Record<string, unknown>;
+  if (typeof v.ratio !== 'number' || v.ratio < 0 || v.ratio > 1) return null;
+  return {
+    id: typeof v.id === 'string' && v.id !== '' ? v.id : makeId(),
+    ratio: v.ratio,
+    label: typeof v.label === 'string' ? v.label : '',
+    createdAt: typeof v.createdAt === 'string' ? v.createdAt : new Date(0).toISOString(),
+  };
+}
+
+function coerceSettings(s: Record<string, unknown>): Settings {
+  return {
+    font: s.font === 'gothic' ? 'gothic' : 'mincho',
+    fontSize:
+      typeof s.fontSize === 'number' && (FONT_SIZES as readonly number[]).includes(s.fontSize)
+        ? s.fontSize
+        : DEFAULT_SETTINGS.fontSize,
+    lineHeight:
+      typeof s.lineHeight === 'number' &&
+      (LINE_HEIGHTS as readonly number[]).includes(s.lineHeight)
+        ? s.lineHeight
+        : DEFAULT_SETTINGS.lineHeight,
+    theme: s.theme === 'light' || s.theme === 'dark' || s.theme === 'sepia' ? s.theme : 'auto',
+    ruby: typeof s.ruby === 'boolean' ? s.ruby : DEFAULT_SETTINGS.ruby,
+  };
 }
 
 function coerceWork(value: unknown): Work | null {
@@ -79,6 +117,8 @@ export class Library {
     works: [],
     progress: {},
     settings: { ...DEFAULT_SETTINGS },
+    bookmarks: {},
+    lastReadId: null,
   };
 
   constructor(
@@ -106,22 +146,17 @@ export class Library {
         }
       }
       if (typeof p.settings === 'object' && p.settings !== null) {
-        const s = p.settings as Record<string, unknown>;
-        this.data.settings = {
-          font: s.font === 'gothic' ? 'gothic' : 'mincho',
-          fontSize:
-            typeof s.fontSize === 'number' && (FONT_SIZES as readonly number[]).includes(s.fontSize)
-              ? s.fontSize
-              : DEFAULT_SETTINGS.fontSize,
-          lineHeight:
-            typeof s.lineHeight === 'number' &&
-            (LINE_HEIGHTS as readonly number[]).includes(s.lineHeight)
-              ? s.lineHeight
-              : DEFAULT_SETTINGS.lineHeight,
-          theme:
-            s.theme === 'light' || s.theme === 'dark' || s.theme === 'sepia' ? s.theme : 'auto',
-          ruby: typeof s.ruby === 'boolean' ? s.ruby : DEFAULT_SETTINGS.ruby,
-        };
+        this.data.settings = coerceSettings(p.settings as Record<string, unknown>);
+      }
+      if (typeof p.bookmarks === 'object' && p.bookmarks !== null) {
+        for (const [k, v] of Object.entries(p.bookmarks)) {
+          if (!Array.isArray(v)) continue;
+          const list = v.map(coerceBookmark).filter((b): b is Bookmark => b !== null);
+          if (list.length > 0) this.data.bookmarks[k] = list;
+        }
+      }
+      if (typeof p.lastReadId === 'string') {
+        this.data.lastReadId = p.lastReadId;
       }
     } catch {
       // 壊れた保存データは無視して既定値から始める。
@@ -169,6 +204,8 @@ export class Library {
       throw new LibraryError('対象の作品が見つかりません');
     }
     delete this.data.progress[id];
+    delete this.data.bookmarks[id];
+    if (this.data.lastReadId === id) this.data.lastReadId = null;
     this.save();
   }
 
@@ -190,4 +227,128 @@ export class Library {
     this.save();
     return this.settings();
   }
+
+  // 最後に開いた作品。書架の「続きから」に使う。削除済みなら無効。
+  lastRead(): Work | null {
+    if (this.data.lastReadId === null) return null;
+    return this.get(this.data.lastReadId);
+  }
+
+  setLastRead(id: string): void {
+    if (this.get(id) === null) return;
+    this.data.lastReadId = id;
+    this.save();
+  }
+
+  bookmarks(id: string): Bookmark[] {
+    return [...(this.data.bookmarks[id] ?? [])].sort((a, b) => a.ratio - b.ratio);
+  }
+
+  addBookmark(id: string, ratio: number, label: string): Bookmark {
+    if (this.get(id) === null) {
+      throw new LibraryError('対象の作品が見つかりません');
+    }
+    const bookmark: Bookmark = {
+      id: makeId(),
+      ratio: Math.min(1, Math.max(0, ratio)),
+      label,
+      createdAt: this.now().toISOString(),
+    };
+    const list = this.data.bookmarks[id] ?? [];
+    list.push(bookmark);
+    this.data.bookmarks[id] = list;
+    this.save();
+    return bookmark;
+  }
+
+  removeBookmark(id: string, bookmarkId: string): void {
+    const list = this.data.bookmarks[id];
+    if (list === undefined) return;
+    this.data.bookmarks[id] = list.filter((b) => b.id !== bookmarkId);
+    if (this.data.bookmarks[id].length === 0) delete this.data.bookmarks[id];
+    this.save();
+  }
+
+  // 書架まるごとをJSONで書き出す。端末固有の最後に開いた作品は含めない。
+  exportJSON(): string {
+    return JSON.stringify(
+      {
+        version: 1,
+        exportedAt: this.now().toISOString(),
+        works: this.data.works,
+        progress: this.data.progress,
+        bookmarks: this.data.bookmarks,
+        settings: this.data.settings,
+      },
+      null,
+      2,
+    );
+  }
+
+  // 書き出したJSONを取り込む。merge は本文が重複しない作品だけ足し、
+  // replace は書架を入れ替える。戻り値は新たに追加した作品数。
+  importJSON(raw: string, mode: 'merge' | 'replace' = 'merge'): { added: number } {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new LibraryError('読み込めるJSONではありません');
+    }
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new LibraryError('読み込めるJSONではありません');
+    }
+    const p = parsed as Record<string, unknown>;
+    if (!Array.isArray(p.works)) {
+      throw new LibraryError('作品データが見つかりません');
+    }
+    const works = p.works.map(coerceWork).filter((w): w is Work => w !== null);
+    const progress = readRatioMap(p.progress);
+    const bookmarks = readBookmarkMap(p.bookmarks);
+
+    if (mode === 'replace') {
+      this.data.works = works;
+      this.data.progress = progress;
+      this.data.bookmarks = bookmarks;
+      if (typeof p.settings === 'object' && p.settings !== null) {
+        this.data.settings = coerceSettings(p.settings as Record<string, unknown>);
+      }
+      this.data.lastReadId = null;
+      this.save();
+      return { added: works.length };
+    }
+
+    let added = 0;
+    for (const work of works) {
+      if (this.data.works.some((w) => w.text === work.text)) continue;
+      const id = this.data.works.some((w) => w.id === work.id) ? makeId() : work.id;
+      this.data.works.push({ ...work, id });
+      const carriedProgress = progress[work.id];
+      if (carriedProgress !== undefined) this.data.progress[id] = carriedProgress;
+      const carriedBookmarks = bookmarks[work.id];
+      if (carriedBookmarks !== undefined) this.data.bookmarks[id] = carriedBookmarks;
+      added++;
+    }
+    this.save();
+    return { added };
+  }
+}
+
+function readRatioMap(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (typeof value !== 'object' || value === null) return out;
+  for (const [k, v] of Object.entries(value)) {
+    if (typeof v === 'number' && v >= 0 && v <= 1) out[k] = v;
+  }
+  return out;
+}
+
+function readBookmarkMap(value: unknown): Record<string, Bookmark[]> {
+  const out: Record<string, Bookmark[]> = {};
+  if (typeof value !== 'object' || value === null) return out;
+  for (const [k, v] of Object.entries(value)) {
+    if (!Array.isArray(v)) continue;
+    const list = v.map(coerceBookmark).filter((b): b is Bookmark => b !== null);
+    if (list.length > 0) out[k] = list;
+  }
+  return out;
 }
