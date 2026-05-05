@@ -283,9 +283,65 @@ h1 {
 }
 
 /* 書架は「カードの羅列」をやめ、1px罫線と余白で組む(箱・影を排す)。 */
+.shelf-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  margin-block: 4px 18px;
+  padding-block-end: 9px;
+  border-block-end: 1px solid var(--line);
+  transition: border-color 0.25s ease;
+}
+
+.shelf-search:focus-within {
+  border-color: var(--accent);
+}
+
+.shelf-search svg {
+  inline-size: 16px;
+  block-size: 16px;
+  flex: none;
+  color: var(--muted);
+  transition: color 0.25s ease;
+}
+
+.shelf-search:focus-within svg {
+  color: var(--accent);
+}
+
+.shelf-search input {
+  flex: 1;
+  font: inherit;
+  font-size: 0.9rem;
+  border: none;
+  background: none;
+  color: var(--text);
+  padding-block: 2px;
+}
+
+.shelf-search input::placeholder {
+  color: var(--muted);
+}
+
+.shelf-search input:focus {
+  outline: none;
+}
+
+.shelf-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .work-list {
   list-style: none;
   border-block-start: 1px solid var(--line);
+}
+
+.work-empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding-block: 20px;
 }
 
 .work {

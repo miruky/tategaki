@@ -102,3 +102,26 @@ export function countMatches(text: string, query: string): number {
   if (query === '') return 0;
   return splitHighlight(text, query).filter((s) => s.hit).length;
 }
+
+export interface MatchContext {
+  before: string;
+  hit: string;
+  after: string;
+}
+
+// 検索結果の一覧に出す前後の文脈。前後を ctx 文字ずつ切り出し、
+// 端が途中なら省略記号を付ける。位置は呼び出し側が把握している前提。
+export function contextSnippet(
+  text: string,
+  start: number,
+  hitLen: number,
+  ctx = 12,
+): MatchContext {
+  const from = Math.max(0, start - ctx);
+  const to = Math.min(text.length, start + hitLen + ctx);
+  return {
+    before: (from > 0 ? '…' : '') + text.slice(from, start),
+    hit: text.slice(start, start + hitLen),
+    after: text.slice(start + hitLen, to) + (to < text.length ? '…' : ''),
+  };
+}
