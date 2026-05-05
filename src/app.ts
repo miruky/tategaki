@@ -7,6 +7,7 @@ import { decodeAozora } from './lib/encoding';
 import type { Bookmark, Library, Settings, Work } from './lib/library';
 import { FONT_SIZES, LibraryError, LINE_HEIGHTS } from './lib/library';
 import {
+  contextSnippet,
   countChars,
   extractHeadings,
   filterWorks,
@@ -66,6 +67,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
   let pageWidth = 1;
   let openPanel: Panel = null;
   let marks: HTMLElement[] = [];
+  let matchSnippets: string[] = [];
   let matchIndex = -1;
 
   root.innerHTML = `
@@ -134,10 +136,13 @@ export function mountApp(root: HTMLElement, lib: Library): void {
       <div id="toc-panel" class="panel toc-panel" hidden></div>
       <div id="settings-panel" class="panel settings-panel" hidden></div>
       <div id="search-panel" class="panel search-panel" hidden>
-        <input type="search" id="search-input" placeholder="本文を検索" aria-label="本文を検索">
-        <span id="search-count" class="search-count" aria-live="polite"></span>
-        <button type="button" id="search-prev" class="ghost" aria-label="前の一致">前</button>
-        <button type="button" id="search-next" class="ghost" aria-label="次の一致">次</button>
+        <div class="search-bar">
+          <input type="search" id="search-input" placeholder="本文を検索" aria-label="本文を検索">
+          <span id="search-count" class="search-count" aria-live="polite"></span>
+          <button type="button" id="search-prev" class="ghost" aria-label="前の一致">前</button>
+          <button type="button" id="search-next" class="ghost" aria-label="次の一致">次</button>
+        </div>
+        <ol id="search-results" class="search-results"></ol>
       </div>
       <div id="bookmark-panel" class="panel bookmark-panel" hidden></div>
       <div id="viewport" class="reader-viewport">
@@ -434,6 +439,7 @@ export function mountApp(root: HTMLElement, lib: Library): void {
   function runSearch(query: string): void {
     renderContent();
     marks = [];
+    matchSnippets = [];
     matchIndex = -1;
     if (query !== '') {
       const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, {
@@ -450,25 +456,43 @@ export function mountApp(root: HTMLElement, lib: Library): void {
         }
       }
       for (const node of targets) {
-        const segments = splitHighlight(node.textContent ?? '', query);
+        const text = node.textContent ?? '';
+        const segments = splitHighlight(text, query);
         const frag = document.createDocumentFragment();
+        let offset = 0;
         for (const seg of segments) {
           if (seg.hit) {
             const mark = document.createElement('mark');
             mark.className = 'hit';
             mark.textContent = seg.text;
             marks.push(mark);
+            const ctx = contextSnippet(text, offset, seg.text.length);
+            matchSnippets.push(`${esc(ctx.before)}<mark>${esc(ctx.hit)}</mark>${esc(ctx.after)}`);
             frag.appendChild(mark);
           } else {
             frag.appendChild(document.createTextNode(seg.text));
           }
+          offset += seg.text.length;
         }
         node.replaceWith(frag);
       }
     }
     $('#search-count').textContent =
       query === '' ? '' : marks.length === 0 ? '見つかりません' : `${marks.length}件`;
-    if (marks.length > 0) gotoMatch(0);
+    renderSearchResults();
+    if (marks.length > 0) showMatch(0); // 検索直後は先頭の一致へ
+  }
+
+  // 検索結果を文脈つきで一覧する。クリックでその一致へ飛べる。
+  function renderSearchResults(): void {
+    const box = $<HTMLOListElement>('#search-results');
+    box.innerHTML = matchSnippets
+      .map(
+        (html, i) =>
+          `<li><button type="button" class="search-hit" data-match="${i}">` +
+          `<span class="search-hit-no">${i + 1}</span><span class="search-hit-text">${html}</span></button></li>`,
+      )
+      .join('');
   }
 
   function pageOfElement(el: HTMLElement): number {
@@ -477,10 +501,13 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     return Math.min(totalPages - 1, Math.max(0, target));
   }
 
-  function gotoMatch(delta: number): void {
+  function showMatch(index: number): void {
     if (marks.length === 0) return;
-    matchIndex = (matchIndex + delta + marks.length) % marks.length;
+    matchIndex = ((index % marks.length) + marks.length) % marks.length;
     marks.forEach((m, i) => m.classList.toggle('current', i === matchIndex));
+    const items = $('#search-results').querySelectorAll<HTMLElement>('.search-hit');
+    items.forEach((el, i) => el.classList.toggle('current', i === matchIndex));
+    items[matchIndex]?.scrollIntoView({ block: 'nearest' });
     const mark = marks[matchIndex];
     if (mark !== undefined) {
       goTo(pageOfElement(mark));
@@ -488,14 +515,21 @@ export function mountApp(root: HTMLElement, lib: Library): void {
     }
   }
 
+  function gotoMatch(delta: number): void {
+    if (marks.length === 0) return;
+    showMatch(matchIndex + delta);
+  }
+
   function clearSearch(): void {
     if (marks.length === 0 && matchIndex === -1) return;
     marks = [];
+    matchSnippets = [];
     matchIndex = -1;
     const keep = ratio();
     renderContent();
     paginate(keep);
     $('#search-count').textContent = '';
+    $('#search-results').innerHTML = '';
     $<HTMLInputElement>('#search-input').value = '';
   }
 
@@ -704,6 +738,11 @@ export function mountApp(root: HTMLElement, lib: Library): void {
 
   $('#search-prev').addEventListener('click', () => gotoMatch(-1));
   $('#search-next').addEventListener('click', () => gotoMatch(1));
+
+  $('#search-results').addEventListener('click', (e) => {
+    const hit = (e.target as HTMLElement).closest<HTMLElement>('[data-match]');
+    if (hit !== null) showMatch(Number(hit.dataset.match));
+  });
 
   $('#bookmark-panel').addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
