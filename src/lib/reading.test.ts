@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseAozora } from './aozora';
 import {
+  contextSnippet,
   countChars,
   countMatches,
   estimateMinutes,
@@ -112,6 +113,24 @@ describe('extractHeadings', () => {
 
   it('見出しがなければ空配列', () => {
     expect(extractHeadings(parseAozora('題\n著者\n\n本文のみ。'))).toEqual([]);
+  });
+});
+
+describe('contextSnippet', () => {
+  it('前後を切り出し、両端が途中なら省略記号を付ける', () => {
+    const text = '春はあけぼの。やうやう白くなりゆく山ぎは。';
+    const start = text.indexOf('白く');
+    const c = contextSnippet(text, start, 2, 4);
+    expect(c.hit).toBe('白く');
+    expect(c.before).toBe('…やうやう');
+    expect(c.after).toBe('なりゆく…');
+  });
+
+  it('先頭・末尾では省略記号を付けない', () => {
+    const c = contextSnippet('猫である', 0, 1, 12);
+    expect(c.before).toBe('');
+    expect(c.hit).toBe('猫');
+    expect(c.after).toBe('である');
   });
 });
 
