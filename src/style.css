@@ -520,6 +520,19 @@ h1 {
   animation: rise 0.22s ease both;
 }
 
+.search-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .search-panel input {
   flex: 1;
   min-width: 10rem;
@@ -534,6 +547,68 @@ h1 {
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   min-width: 5em;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 38vh;
+  overflow-y: auto;
+}
+
+.search-results:empty {
+  display: none;
+}
+
+.search-hit {
+  display: flex;
+  gap: 12px;
+  inline-size: 100%;
+  text-align: start;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  padding: 9px 8px;
+  border-block-end: 1px solid var(--line);
+  border-inline-start: 2px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.search-hit:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.search-hit.current {
+  border-inline-start-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.search-hit-no {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  padding-block-start: 1px;
+  min-inline-size: 1.6em;
+  text-align: end;
+}
+
+.search-hit-text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.search-hit-text mark {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: inherit;
+  border-radius: 2px;
 }
 
 .toc-panel {
